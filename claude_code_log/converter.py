@@ -3,6 +3,8 @@
 
 from pathlib import Path
 import traceback
+import os
+from datetime import datetime
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -37,6 +39,7 @@ def convert_jsonl_to_html(
     to_date: Optional[str] = None,
     generate_individual_sessions: bool = True,
     use_cache: bool = True,
+    inherit_timestamps: bool = False,
 ) -> Path:
     """Convert JSONL transcript(s) to HTML file(s)."""
     if not input_path.exists():
@@ -103,15 +106,15 @@ def convert_jsonl_to_html(
     else:
         print(f"HTML file {output_path.name} is current, skipping regeneration")
 
+    # Update cache with session and project data if available (do this BEFORE generating individual files)
+    if cache_manager is not None and input_path.is_dir():
+        _update_cache_with_session_data(cache_manager, messages)
+
     # Generate individual session files if requested and in directory mode
     if generate_individual_sessions and input_path.is_dir():
         _generate_individual_session_files(
-            messages, input_path, from_date, to_date, cache_manager
+            messages, input_path, from_date, to_date, cache_manager, inherit_timestamps
         )
-
-    # Update cache with session and project data if available
-    if cache_manager is not None and input_path.is_dir():
-        _update_cache_with_session_data(cache_manager, messages)
 
     return output_path
 
@@ -403,6 +406,7 @@ def _generate_individual_session_files(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     cache_manager: Optional["CacheManager"] = None,
+    inherit_timestamps: bool = False,
 ) -> None:
     """Generate individual HTML files for each session."""
     # Find all unique session IDs
@@ -466,12 +470,44 @@ def _generate_individual_session_files(
         session_file_path = output_dir / f"session-{session_id}.html"
         session_file_path.write_text(session_html, encoding="utf-8")
 
+        # Set file timestamps if requested and cache data is available
+        if inherit_timestamps and session_id in session_data:
+            _set_file_timestamps(session_file_path, session_data[session_id])
+
+
+def _set_file_timestamps(file_path: Path, session_cache: Any) -> None:
+    """Set file timestamps based on session data from cache.
+
+    Args:
+        file_path: Path to the HTML file to update
+        session_cache: SessionCacheData object with timestamp information
+    """
+    try:
+        # Use last_timestamp as the file modification time
+        if hasattr(session_cache, "last_timestamp") and session_cache.last_timestamp:
+            # Parse ISO timestamp and convert to Unix timestamp
+            # Handle both 'Z' suffix and timezone-aware formats
+            timestamp_str = session_cache.last_timestamp
+            if timestamp_str.endswith("Z"):
+                timestamp_str = timestamp_str[:-1] + "+00:00"
+
+            dt = datetime.fromisoformat(timestamp_str)
+            timestamp = dt.timestamp()
+
+            # Set both access and modification time
+            os.utime(file_path, (timestamp, timestamp))
+    except (ValueError, OSError, AttributeError) as e:
+        print(f"Warning: Failed to set timestamp for {file_path.name}: {e}")
+        # File keeps current timestamp on failure
+
 
 def process_projects_hierarchy(
     projects_path: Path,
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     use_cache: bool = True,
+    generate_individual_sessions: bool = True,
+    inherit_timestamps: bool = False,
 ) -> Path:
     """Process the entire ~/.claude/projects/ hierarchy and create linked HTML files."""
     if not projects_path.exists():
@@ -560,7 +596,13 @@ def process_projects_hierarchy(
 
             # Generate HTML for this project (including individual session files)
             output_path = convert_jsonl_to_html(
-                project_dir, None, from_date, to_date, True, use_cache
+                project_dir,
+                None,
+                from_date,
+                to_date,
+                generate_individual_sessions,
+                use_cache,
+                inherit_timestamps,
             )
 
             # Get project info for index - use cached data if available
