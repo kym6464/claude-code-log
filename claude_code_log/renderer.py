@@ -668,8 +668,6 @@ def _get_combined_transcript_link(cache_manager: "CacheManager") -> Optional[str
         return None
 
 
-
-
 def generate_session_html(
     messages: List[TranscriptEntry],
     session_id: str,
@@ -690,15 +688,25 @@ def generate_session_html(
         combined_link = _get_combined_transcript_link(cache_manager)
 
     if not session_messages:
-        return generate_html([], title or f"Session {session_id[:8]}", combined_transcript_link=combined_link)
+        return generate_html(
+            [],
+            title or f"Session {session_id[:8]}",
+            combined_transcript_link=combined_link,
+        )
 
     # Use the existing generate_html function but with filtered messages and combined link
     return generate_html(
-        session_messages, title or f"Session {session_id[:8]}", combined_transcript_link=combined_link
+        session_messages,
+        title or f"Session {session_id[:8]}",
+        combined_transcript_link=combined_link,
     )
 
 
-def generate_html(messages: List[TranscriptEntry], title: Optional[str] = None, combined_transcript_link: Optional[str] = None) -> str:
+def generate_html(
+    messages: List[TranscriptEntry],
+    title: Optional[str] = None,
+    combined_transcript_link: Optional[str] = None,
+) -> str:
     """Generate HTML from transcript messages using Jinja2 templates."""
     if not title:
         title = "Claude Transcript"

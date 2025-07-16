@@ -4,8 +4,6 @@ import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-
 from claude_code_log.cache import CacheManager
 from claude_code_log.renderer import generate_session_html
 
