@@ -37,6 +37,7 @@ def convert_jsonl_to_html(
     to_date: Optional[str] = None,
     generate_individual_sessions: bool = True,
     use_cache: bool = True,
+    inherit_timestamps: bool = False,
 ) -> Path:
     """Convert JSONL transcript(s) to HTML file(s)."""
     if not input_path.exists():
@@ -106,7 +107,7 @@ def convert_jsonl_to_html(
     # Generate individual session files if requested and in directory mode
     if generate_individual_sessions and input_path.is_dir():
         _generate_individual_session_files(
-            messages, input_path, from_date, to_date, cache_manager
+            messages, input_path, from_date, to_date, cache_manager, inherit_timestamps
         )
 
     # Update cache with session and project data if available
@@ -403,6 +404,7 @@ def _generate_individual_session_files(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     cache_manager: Optional["CacheManager"] = None,
+    inherit_timestamps: bool = False,
 ) -> None:
     """Generate individual HTML files for each session."""
     # Find all unique session IDs
@@ -466,12 +468,31 @@ def _generate_individual_session_files(
         session_file_path = output_dir / f"session-{session_id}.html"
         session_file_path.write_text(session_html, encoding="utf-8")
 
+        if inherit_timestamps:
+            jsonl_file_path = output_dir / f"{session_id}.jsonl"
+            if jsonl_file_path.exists():
+                try:
+                    import os
+
+                    # Get the original file's timestamps
+                    original_stat = jsonl_file_path.stat()
+                    # Set the HTML file's timestamps to match
+                    os.utime(
+                        session_file_path,
+                        (original_stat.st_atime, original_stat.st_mtime),
+                    )
+                except Exception as e:
+                    print(
+                        f"Warning: Failed to inherit timestamps for {session_file_path}: {e}"
+                    )
+
 
 def process_projects_hierarchy(
     projects_path: Path,
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     use_cache: bool = True,
+    inherit_timestamps: bool = False,
 ) -> Path:
     """Process the entire ~/.claude/projects/ hierarchy and create linked HTML files."""
     if not projects_path.exists():
@@ -560,7 +581,13 @@ def process_projects_hierarchy(
 
             # Generate HTML for this project (including individual session files)
             output_path = convert_jsonl_to_html(
-                project_dir, None, from_date, to_date, True, use_cache
+                project_dir,
+                None,
+                from_date,
+                to_date,
+                True,
+                use_cache,
+                inherit_timestamps,
             )
 
             # Get project info for index - use cached data if available

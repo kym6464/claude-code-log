@@ -240,6 +240,11 @@ def _clear_html_files(input_path: Path, all_projects: bool) -> None:
     is_flag=True,
     help="Clear all HTML files and force regeneration",
 )
+@click.option(
+    "--inherit-timestamps",
+    is_flag=True,
+    help="Set HTML file timestamps to match source JSONL files",
+)
 def main(
     input_path: Optional[Path],
     output: Optional[Path],
@@ -251,6 +256,7 @@ def main(
     no_cache: bool,
     clear_cache: bool,
     clear_html: bool,
+    inherit_timestamps: bool,
 ) -> None:
     """Convert Claude transcript JSONL files to HTML.
 
@@ -285,7 +291,7 @@ def main(
 
             click.echo(f"Processing all projects in {input_path}...")
             output_path = process_projects_hierarchy(
-                input_path, from_date, to_date, not no_cache
+                input_path, from_date, to_date, not no_cache, inherit_timestamps
             )
 
             # Count processed projects
@@ -335,6 +341,7 @@ def main(
             to_date,
             not no_individual_sessions,
             not no_cache,
+            inherit_timestamps,
         )
         if input_path.is_file():
             click.echo(f"Successfully converted {input_path} to {output_path}")
